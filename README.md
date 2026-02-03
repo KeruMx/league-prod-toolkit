@@ -57,6 +57,7 @@ Screens showing postgame stats
 - Champion Select / ingame overlays require our [Observer Tool](https://github.com/RCVolus/league-observer-tool) to send game data
 - Some features require a Riot API Key
 - Some features do not work on Tournament Realm
+- **Custom Games (5v5 Partidas Personalizadas)**: Require active spectating via the League client for API data access. See [Custom Games Guide](docs/CUSTOM_GAMES.md) for details.
 
 # Installation & Docs
 
