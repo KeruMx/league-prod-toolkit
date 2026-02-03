@@ -39,8 +39,6 @@ function getRegionByServer(server: string): Regions {
       return Regions.TURKEY
     case 'RU':
       return Regions.RUSSIA
-    case 'TR1':
-      return Regions.TURKEY
     default:
       return Regions.EU_EAST
   }
@@ -177,11 +175,20 @@ module.exports = async (ctx: PluginContext) => {
         if (gameInfo && !('message' in gameInfo)) {
           break
         }
+        // If API returned a SpectatorNotAvailableDTO (has 'message'), no need to retry more
+        if (gameInfo && 'message' in gameInfo) {
+          ctx.log.warn(
+            `Spectator data not available for summoner=${e.summonerName}. API response: ${gameInfo.message}`
+          )
+          break
+        }
       } catch (error) {
         ctx.log.warn(
           `Failed to get spectator game information for summoner=${e.summonerName}, encryptedId=${summonerInfo.response.puuid}. Maybe this summoner is not ingame currently? Retrying (attempt ${retries}/${desiredRetries}). error=${error}`
         )
-        await sleep(2000)
+        if (retries <= desiredRetries) {
+          await sleep(2000)
+        }
       }
     }
 
