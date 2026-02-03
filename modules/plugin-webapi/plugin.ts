@@ -186,7 +186,7 @@ module.exports = async (ctx: PluginContext) => {
         ctx.log.warn(
           `Failed to get spectator game information for summoner=${e.summonerName}, encryptedId=${summonerInfo.response.puuid}. Maybe this summoner is not ingame currently? Retrying (attempt ${retries}/${desiredRetries}). error=${error}`
         )
-        if (retries <= desiredRetries) {
+        if (retries < desiredRetries) {
           await sleep(2000)
         }
       }
