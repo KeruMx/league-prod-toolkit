@@ -140,10 +140,9 @@ module.exports = async (ctx: PluginContext) => {
 
   ctx.LPTE.on(namespace, 'fetch-livegame', async (e) => {
     ctx.log.info(`Fetching livegame data for summoner=${e.summonerName}`)
-    ctx.log.info(`Note: Custom games (5v5 custom matches) require someone to actively spectate via the League client for the API to return data. If fetch fails for a custom game, ensure someone has clicked 'Spectate' in the client.`)
 
-    let retries = 0
-    const desiredRetries = e.retries !== undefined ? e.retries : 3
+    let attempts = 0
+    const maxAttempts = e.retries !== undefined ? e.retries + 1 : 4 // retries + 1 initial attempt
 
     const replyMeta = {
       type: e.meta.reply as string,
@@ -167,8 +166,8 @@ module.exports = async (ctx: PluginContext) => {
 
     let gameInfo: SpectatorNotAvailableDTO | ApiResponseDTO<CurrentGameInfoDTO> | undefined
 
-    while (retries <= desiredRetries) {
-      retries++
+    while (attempts < maxAttempts) {
+      attempts++
       try {
         gameInfo = await api.SpectatorV5.activeGame(summonerInfo.response.puuid, region)
         // Successfully got game info, break out of retry loop
@@ -184,9 +183,9 @@ module.exports = async (ctx: PluginContext) => {
         }
       } catch (error) {
         ctx.log.warn(
-          `Failed to get spectator game information for summoner=${e.summonerName}, encryptedId=${summonerInfo.response.puuid}. Maybe this summoner is not ingame currently? Retrying (attempt ${retries}/${desiredRetries}). error=${error}`
+          `Failed to get spectator game information for summoner=${e.summonerName}, encryptedId=${summonerInfo.response.puuid}. Maybe this summoner is not ingame currently? (attempt ${attempts}/${maxAttempts}). error=${error}`
         )
-        if (retries < desiredRetries) {
+        if (attempts < maxAttempts) {
           await sleep(2000)
         }
       }
@@ -195,7 +194,7 @@ module.exports = async (ctx: PluginContext) => {
 
     if (gameInfo === undefined || 'message' in gameInfo) {
       ctx.log.error(
-        `Failed to get spectator game information for summoner=${e.summonerName}, encryptedId=${summonerInfo.response.puuid}, after retries.`
+        `Failed to get spectator game information for summoner=${e.summonerName}, encryptedId=${summonerInfo.response.puuid}, after ${attempts} attempts.`
       )
       ctx.log.error(
         `IMPORTANT: If this is a custom game (5v5 custom match), the Riot API only returns data if someone is actively spectating via the League client. Please ensure someone has clicked 'Spectate' in the client, or use the League Observer Tool (https://github.com/RCVolus/league-observer-tool) as an alternative data source.`
@@ -207,9 +206,15 @@ module.exports = async (ctx: PluginContext) => {
       return
     }
 
+    const isCustomGame = gameInfo.response.gameQueueConfigId === 0
     ctx.log.info(
-      `Fetched livegame for summoner=${e.summonerName}, gameId=${gameInfo.response.gameId}, queueId=${gameInfo.response.gameQueueConfigId} ${gameInfo.response.gameQueueConfigId === 0 ? '(Custom Game)' : ''}`
+      `Fetched livegame for summoner=${e.summonerName}, gameId=${gameInfo.response.gameId}, queueId=${gameInfo.response.gameQueueConfigId}${isCustomGame ? ' (Custom Game)' : ''}`
     )
+    if (isCustomGame) {
+      ctx.log.info(
+        `Note: This is a custom game. Data is only available because someone is spectating via the League client.`
+      )
+    }
     ctx.LPTE.emit({
       meta: replyMeta,
       game: gameInfo.response,
